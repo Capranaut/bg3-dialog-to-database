@@ -1700,7 +1700,7 @@ namespace bg3dialogreader
 
                     Directory.CreateDirectory(AppDomain.CurrentDomain.BaseDirectory + "\\Extracted_audio\\");
                     File.WriteAllBytes(AppDomain.CurrentDomain.BaseDirectory + "\\Extracted_audio\\" + afname + ".wem", compressedFileList);
-                    var process = Process.Start(AppDomain.CurrentDomain.BaseDirectory + "\\vgmstream-cli.exe", "-o " + AppDomain.CurrentDomain.BaseDirectory + "\\Extracted_audio\\" + afname + ".wav " + AppDomain.CurrentDomain.BaseDirectory + "\\Extracted_audio\\" + afname + ".wem");
+                    var process = Process.Start(AppDomain.CurrentDomain.BaseDirectory + "\\vgmstream-cli.exe", "-o \"" + AppDomain.CurrentDomain.BaseDirectory + "\\Extracted_audio\\" + afname + ".wav\" \"" + AppDomain.CurrentDomain.BaseDirectory + "\\Extracted_audio\\" + afname + ".wem\"");
                     process.WaitForExit();
                     File.Delete(AppDomain.CurrentDomain.BaseDirectory + "\\Extracted_audio\\" + afname + ".wem");
                 }
