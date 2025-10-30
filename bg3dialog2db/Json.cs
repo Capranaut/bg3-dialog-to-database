@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace bg3dialogreader
+namespace bg3dialog2db
 {
     internal class Json
     {

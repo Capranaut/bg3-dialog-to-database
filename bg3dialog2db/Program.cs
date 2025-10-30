@@ -1,4 +1,4 @@
-namespace bg3dialogreader
+namespace bg3dialog2db
 {
     internal static class Program
     {

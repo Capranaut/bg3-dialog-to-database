@@ -16,20 +16,21 @@ using System.Reflection.Emit;
 using System.Text;
 using System.Windows.Forms;
 using System.Xml;
-using static bg3dialogreader.Form1;
-using static bg3dialogreader.Json;
+using static bg3dialog2db.Form1;
+using static bg3dialog2db.Json;
 using static System.Net.Mime.MediaTypeNames;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Button;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.ToolBar;
 
-namespace bg3dialogreader
+namespace bg3dialog2db
 {
     public partial class Form1 : Form
     {
         private Resource _resource;
-        SqliteConnection connection = new("Data Source=bg3.db");
+        SqliteConnection connection = new(Params.dbConnectionString);
         SqliteCommand sqliteCommand = new();
+
         List<string> fdialogs = [];
         List<string> adialogs = [];
         List<Task> converttasks = [];
@@ -46,14 +47,9 @@ namespace bg3dialogreader
         public Form1()
         {
             InitializeComponent();
-            if (!File.Exists("vgmstream-cli.exe"))
+            if (File.Exists(Params.dbFilename))
             {
-                linkLabelNotFoundVGM.Visible = true;
-                //exportToolStripMenuItem.Enabled = false;
-            }
-            if (File.Exists("bg3.db"))
-            {
-                DateTime fd = File.GetCreationTime("bg3.db");
+                DateTime fd = File.GetCreationTime(Params.dbFilename);
                 labelDBInfo.Text = "(Database created: " + fd.ToString() + ")";
                 labelDBInfo.Visible = true;
             }
@@ -64,16 +60,16 @@ namespace bg3dialogreader
             }
         }
 
-        private void parsetranslation()
+        private void ParseTranslation()
         {
             string locPak = "";
             string locLang = "";
             this.Invoke(new MethodInvoker(delegate () { locLang = comboBoxLanguageSelect.Text; }));
 
+
+            locPak = bg3path + "\\Localization\\" + locLang + "\\" + locLang + ".pak";
             if (locLang == "English")
-                locPak = bg3path + "\\Localization\\English.pak";
-            else
-                locPak = bg3path + "\\Localization\\" + locLang + "\\" + locLang + ".pak"; //"\\Localization\\English.pak";
+                locPak = bg3path + "\\Localization\\English.pak"; //English is in root localization folder
 
             var pakReader = new PackageReader();
             using var package = pakReader.Read(locPak);
@@ -87,6 +83,15 @@ namespace bg3dialogreader
                     var locReader = LocaUtils.Load(fileStream, fileExt);
 
                     sqliteCommand.CommandText = "INSERT or REPLACE INTO tagsflags VALUES (@handle,@text,null)";
+                    foreach (var entry in locReader.Entries)
+                    {
+                        sqliteCommand.Parameters.Add(new SqliteParameter("@handle", entry.Key));
+                        sqliteCommand.Parameters.Add(new SqliteParameter("@text", entry.Text));
+                        sqliteCommand.ExecuteNonQuery();
+                        sqliteCommand.Parameters.Clear();
+                    }
+
+                    sqliteCommand.CommandText = "INSERT or REPLACE INTO LocLangTable VALUES (@handle,@text)";
                     foreach (var entry in locReader.Entries)
                     {
                         sqliteCommand.Parameters.Add(new SqliteParameter("@handle", entry.Key));
@@ -163,6 +168,14 @@ namespace bg3dialogreader
                 sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", entry.Key));
                 sqliteCommand.Parameters.Add(new SqliteParameter("@text", entry.Value));
                 sqliteCommand.Parameters.Add(new SqliteParameter("@desc", DBNull.Value));
+
+                sqliteCommand.ExecuteNonQuery();
+                sqliteCommand.Parameters.Clear();
+
+                sqliteCommand.CommandText = "INSERT or REPLACE INTO LookupTable VALUES (@uuid,@text)";
+
+                sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", entry.Key));
+                sqliteCommand.Parameters.Add(new SqliteParameter("@text", entry.Value));
 
                 sqliteCommand.ExecuteNonQuery();
                 sqliteCommand.Parameters.Clear();
@@ -426,30 +439,21 @@ namespace bg3dialogreader
             XmlDocument xDoc = new XmlDocument();
             xDoc.Load(xmreader);
 
-            XmlNode node = xDoc.DocumentElement.SelectSingleNode("/save/region/node/children");
+            XmlNode L0Node = xDoc.DocumentElement.SelectSingleNode("/save/region/node/children");
 
-            foreach (XmlNode item in node.ChildNodes)
+            foreach (XmlNode L1Node in L0Node)//.ChildNodes)
             {
-                if (item.Attributes.GetNamedItem("id").Value == "Quest")
+                if (Utilities.NodeIdIs(L1Node,"Quest"))
                 {
-                    foreach (XmlNode item1 in item.LastChild)
+                    foreach (XmlNode L2Node in L1Node.LastChild)
                     {
-                        if (item1.Attributes.GetNamedItem("id").Value == "QuestStep")
+                        if (Utilities.NodeIdIs(L2Node, "QuestStep"))
                         {
-                            string uuid = "";
-                            string stringname = "";
-                            string desc = "";
+                            string[] Find = ["DialogFlagGUID", "ID", "Description"];
+                            string[] Get = ["value", "value", "handle"];
                             string desc2 = "";
-                            foreach (XmlNode item2 in item1.ChildNodes)
-                            {
-                                if (item2.Name == "attribute" && item2.Attributes.GetNamedItem("id").Value == "DialogFlagGUID")
-                                    uuid = item2.Attributes.GetNamedItem("value").Value;
-                                if (item2.Name == "attribute" && item2.Attributes.GetNamedItem("id").Value == "ID")
-                                    stringname = item2.Attributes.GetNamedItem("value").Value;
-                                if (item2.Name == "attribute" && item2.Attributes.GetNamedItem("id").Value == "Description")
-                                    desc = item2.Attributes.GetNamedItem("handle").Value;
-                            }
 
+                            (string uuid, string stringname, string desc) = Unpack.Three(Utilities.GetNodeVal(L2Node.ChildNodes, Find, Get));
 
                             sqliteCommand.CommandText = "SELECT * FROM tagsflags WHERE uuid=@uuid";
                             sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", desc));
@@ -473,12 +477,19 @@ namespace bg3dialogreader
                             sqliteCommand.Parameters.Add(new SqliteParameter("@desc", desc2));
                             sqliteCommand.ExecuteNonQuery();
                             sqliteCommand.Parameters.Clear();
+
+                            sqliteCommand.CommandText = "INSERT or REPLACE INTO TestTable VALUES (@uuid,@text,@desc)";
+                            sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", uuid));
+                            sqliteCommand.Parameters.Add(new SqliteParameter("@text", stringname));
+                            sqliteCommand.Parameters.Add(new SqliteParameter("@desc", desc2));
+                            sqliteCommand.ExecuteNonQuery();
+                            sqliteCommand.Parameters.Clear();
                         }
                     }
                 }
             }
         }
-        private void tagsflags(PackagedFileInfo file)
+        private void tagsflags(PackagedFileInfo file, bool istag)
         {
             using var fileStream = file.CreateContentReader();
             using var asd = new MemoryStream();
@@ -509,6 +520,19 @@ namespace bg3dialogreader
             XmlNode node = xDoc.DocumentElement.SelectSingleNode("/save/region/node");
 
             //node.ChildNodes[0].Attributes.GetNamedItem("value");
+
+            if(istag)//tagcheck
+            {
+                try
+                {
+                    //Parse.Flags(BgSQLite.dbCommand, node);
+                }
+                catch(ArgumentException)
+                {
+                    //NEED TO LOG SHTI ASIDHFAIOSD FGASOIDG
+                }
+                
+            }
 
 
             foreach (XmlNode item in node.ChildNodes)
@@ -543,8 +567,10 @@ namespace bg3dialogreader
             List<PackagedFileInfo> files = package.Files;
             foreach (var file in files)
             {
-                if ((file.Name.Contains("/Tags/") || file.Name.Contains("/Flags/")) && file.Name.Contains(".ls"))
-                    tagsflags(file);
+                if ((file.Name.Contains("/Tags/") && file.Name.Contains(".ls")))
+                    tagsflags(file, false);
+                if ((file.Name.Contains("/Flags/") && file.Name.Contains(".ls")))
+                    tagsflags(file, true);
                 if (file.Name.Contains("/Story/Journal/quest_prototypes.lsx"))
                     questflags(file);
                 if (file.Name.Contains("/ApprovalRatings/Reactions/"))
@@ -838,10 +864,10 @@ namespace bg3dialogreader
                     }
                 }
                 //textlines.Add(index, text);
-                
+
                 if (node.children?[0].child?[0].UUID?.value == null && node.endnode?.value == null && node.constructor.value == "TagAnswer" && node.optional?.value != true)
                 {
-                    var listSkip = new List<string>() { 
+                    var listSkip = new List<string>() {
                         "Mods/GustavDev/Story/Dialogs/Act2/MoonriseTowers/MOO_Assault_FirstKethericInterruption.lsj",
                         "Mods/GustavDev/Story/Dialogs/Act2/MoonriseTowers/MOO_ZrellBriefing_AD_WithSpy.lsj",
                         "Mods/GustavDev/Story/Dialogs/Companions/Gale_InParty2_Nested_ArcaneTower.lsj",
@@ -875,7 +901,7 @@ namespace bg3dialogreader
                             {
                                 parentNode = childDict.FirstOrDefault(p => p.Value.Contains(parentNode)).Key;
                             }
-                            
+
                         }
                         parentNode = childDict.FirstOrDefault(p => p.Value.Contains(parentNode)).Key;
 
@@ -932,9 +958,9 @@ namespace bg3dialogreader
                                     setflag.Add("<span class='setflag' title='" + locIdStrings[flagsetgroupitem.UUID.value].Split(new[] { "&----&" }, StringSplitOptions.None)[1].Replace("'", "&#39") + "'>" + locIdStrings[flagsetgroupitem.UUID.value].Split(new[] { "&----&" }, StringSplitOptions.None)[0].ToString() + "</span>" + " = " + flagsetgroupitem.value.value);
                             else
                                 if (flagsetgroupitem.value.value)
-                                    setflag.Add("<span class='setflag' title='None'>" + flagsetgroupitem.UUID.value + "</span>");
-                                else
-                                    setflag.Add("<span class='setflag' title='None'>" + flagsetgroupitem.UUID.value + "</span>" + " = " + flagsetgroupitem.value.value);
+                                setflag.Add("<span class='setflag' title='None'>" + flagsetgroupitem.UUID.value + "</span>");
+                            else
+                                setflag.Add("<span class='setflag' title='None'>" + flagsetgroupitem.UUID.value + "</span>" + " = " + flagsetgroupitem.value.value);
                             //setflag.Add(flagsetgroupitem.UUID.value, flagsetgroupitem.value.value);
                         }
                     }
@@ -953,9 +979,9 @@ namespace bg3dialogreader
                                     checkflag.Add("<span class='checkflag' title='" + locIdStrings[flagcheckgroupitem.UUID.value].Split(new[] { "&----&" }, StringSplitOptions.None)[1].ToString().Replace("'", "&#39") + "'>" + locIdStrings[flagcheckgroupitem.UUID.value].Split(new[] { "&----&" }, StringSplitOptions.None)[0].ToString() + "</span>" + " = " + flagcheckgroupitem.value.value);
                             else
                                 if (flagcheckgroupitem.value.value)
-                                    checkflag.Add("<span class='checkflag' title='None'>" + flagcheckgroupitem.UUID.value + "</span>");
-                                else
-                                    checkflag.Add("<span class='checkflag' title='None'>" + flagcheckgroupitem.UUID.value + "</span>" + " = " + flagcheckgroupitem.value.value);
+                                checkflag.Add("<span class='checkflag' title='None'>" + flagcheckgroupitem.UUID.value + "</span>");
+                            else
+                                checkflag.Add("<span class='checkflag' title='None'>" + flagcheckgroupitem.UUID.value + "</span>" + " = " + flagcheckgroupitem.value.value);
                             //checkflag.Add(flagcheckgroupitem.UUID.value, flagcheckgroupitem.value.value);
                         }
                     }
@@ -984,7 +1010,7 @@ namespace bg3dialogreader
                     }
                     //else
                     //{
-                        //jumps.Add(index, uuidToNodeId[node.jumptarget.value].ToString());
+                    //jumps.Add(index, uuidToNodeId[node.jumptarget.value].ToString());
                     //}
                 }
                 constructor = node.constructor.value;
@@ -1141,14 +1167,7 @@ namespace bg3dialogreader
                     rolls = "<span class='rolls'>" + "Roll " + "(" + ability + ", " + skill + ") vs " + difficulty + " (" + advantage + ")" + "</span>";
 
                 if (context != "")
-                    if (radioButtonDevNotesSuperscript.Checked)
-                    {
-                        context = "<span class='context' title='" + context + "'><sup>devnote</sup></span>";
-                    }
-                    else if (radioButtonDevNotesInLine.Checked)
-                    {
-                        context = "<span class='context'>" + context + "'</span>";
-                    }
+                    context = "<span class='context'>" + context + "'</span>";
 
                 if (textsss.Count > 0)
                 {
@@ -1321,7 +1340,7 @@ namespace bg3dialogreader
                 {
                     node.transitionmode = new Transitionmode();
                     node.transitionmode.type = "uint8";
-                    node.transitionmode.value = 0; 
+                    node.transitionmode.value = 0;
                 }
 
                 if (node.waittime == null)
@@ -1395,7 +1414,7 @@ namespace bg3dialogreader
                             node.ShowOnce.type = "bool";
                             node.ShowOnce.value = true;
                         }
-    
+
 
                     }
                 }
@@ -1625,88 +1644,6 @@ namespace bg3dialogreader
                 }
             }
         }
-        public void bplay()
-        {
-            string audiof = "";
-            if (listViewDialog.SelectedItems[0].SubItems[2].Text != "")
-            {
-                audiof = listViewDialog.SelectedItems[0].SubItems[2].Text;
-
-                foreach (var item in adialogs)
-                {
-                    var itemp = item.Split(';');
-                    if (itemp[0].Contains(audiof))
-                    {
-                        play(itemp[1], itemp[2], itemp[3]);
-                        break;
-                    }
-                }
-            }
-        }
-        public void play(string off, string zsize, string size)
-        {
-            string voicepak = bg3path + "\\Localization\\Voice.pak";
-            long x = 0;
-            int y = 0;
-            Int64.TryParse(off, out x);
-            Int32.TryParse(zsize, out y);
-            using (FileStream fileStream = new FileStream(voicepak, FileMode.Open, FileAccess.Read))
-            {
-                using (BinaryReader binaryReader1 = new BinaryReader(fileStream))
-                {
-                    binaryReader1.BaseStream.Position = x;
-                    int compressedSize = y;
-                    var compressedFileList = binaryReader1.ReadBytes(compressedSize);
-
-                    File.WriteAllBytes("temp.wem", compressedFileList);
-                    var process = Process.Start(AppDomain.CurrentDomain.BaseDirectory + "\\vgmstream-cli.exe", "-o temp.wav temp.wem");
-                    process.WaitForExit();
-                    SoundPlayer simpleSound = new SoundPlayer(AppDomain.CurrentDomain.BaseDirectory + "\\temp.wav");
-                    simpleSound.Play();
-                }
-            }
-        }
-
-        public void extr(string afpath, string off, string zsize, string size)
-        {
-            string voicepak = bg3path + "\\Localization\\Voice.pak";
-            long x = 0;
-            int y = 0;
-            Int64.TryParse(off, out x);
-            Int32.TryParse(zsize, out y);
-            var afname = Path.GetFileName(afpath);
-            using (FileStream fileStream = new FileStream(voicepak, FileMode.Open, FileAccess.Read))
-            {
-                using (BinaryReader binaryReader1 = new BinaryReader(fileStream))
-                {
-                    binaryReader1.BaseStream.Position = x;
-                    int compressedSize = y;
-                    var compressedFileList = binaryReader1.ReadBytes(compressedSize);
-
-                    /*
-                    using (SaveFileDialog saveFileDialog1 = new SaveFileDialog())
-                    {
-                        saveFileDialog1.FileName = afname;
-                        saveFileDialog1.Filter = "wem (*.wem)| *.wem";
-                        if (saveFileDialog1.ShowDialog() == DialogResult.OK)
-                        {
-                            File.WriteAllBytes(saveFileDialog1.FileName, compressedFileList);
-                            var process = Process.Start(AppDomain.CurrentDomain.BaseDirectory + "\\vgmstream-cli.exe", "-o " + saveFileDialog1.FileName + ".wav " + saveFileDialog1.FileName);
-                            process.WaitForExit();
-                            File.Delete(saveFileDialog1.FileName);
-                        }
-                    }
-                    */
-
-                    Directory.CreateDirectory(AppDomain.CurrentDomain.BaseDirectory + "\\Extracted_audio\\");
-                    File.WriteAllBytes(AppDomain.CurrentDomain.BaseDirectory + "\\Extracted_audio\\" + afname + ".wem", compressedFileList);
-                    var process = Process.Start(AppDomain.CurrentDomain.BaseDirectory + "\\vgmstream-cli.exe", "-o \"" + AppDomain.CurrentDomain.BaseDirectory + "\\Extracted_audio\\" + afname + ".wav\" \"" + AppDomain.CurrentDomain.BaseDirectory + "\\Extracted_audio\\" + afname + ".wem\"");
-                    process.WaitForExit();
-                    File.Delete(AppDomain.CurrentDomain.BaseDirectory + "\\Extracted_audio\\" + afname + ".wem");
-                }
-            }
-
-        }
 
         public void LoadDB()
         {
@@ -1741,9 +1678,11 @@ namespace bg3dialogreader
             comboBoxLanguageSelect.Enabled = false;
             labelDBInfo.Text = "(Creating database)";
 
-            File.Delete("bg3.db");
+            File.Delete(Params.dbFilename);
 
             var watch = Stopwatch.StartNew();
+
+            BgSQLite.Make();
 
 
             connection.Open();
@@ -1753,25 +1692,60 @@ namespace bg3dialogreader
             sqliteCommand.CommandText = "CREATE UNIQUE INDEX indx ON tagsflags(uuid)";
             sqliteCommand.ExecuteNonQuery();
 
+            sqliteCommand.CommandText = "CREATE TABLE LocLangTable (uuid text, line text)";
+            sqliteCommand.ExecuteNonQuery();
+            sqliteCommand.CommandText = "CREATE UNIQUE INDEX LocLangTableIdx ON LocLangTable(uuid)";
+            sqliteCommand.ExecuteNonQuery();
+
+            sqliteCommand.CommandText = "CREATE TABLE TestTable (uuid text, name text, description text)";
+            sqliteCommand.ExecuteNonQuery();
+            sqliteCommand.CommandText = "CREATE UNIQUE INDEX TestTableIdx ON TestTable(uuid)";
+            sqliteCommand.ExecuteNonQuery();
+
+            sqliteCommand.CommandText = "CREATE TABLE LookupTable (uuid text, name text)";
+            sqliteCommand.ExecuteNonQuery();
+            sqliteCommand.CommandText = "CREATE UNIQUE INDEX LookupTableIdx ON LookupTable(uuid)";
+            sqliteCommand.ExecuteNonQuery();
+
             sqliteCommand.CommandText = "begin";
             sqliteCommand.ExecuteNonQuery();
 
 
 
 
+           /* if ((file.Name.Contains("/Tags/") || file.Name.Contains("/Flags/")) && file.Name.Contains(".ls"))
+                tagsflags(file);
+            if (file.Name.Contains("/Story/Journal/quest_prototypes.lsx"))
+                questflags(file);
+            if (file.Name.Contains("/ApprovalRatings/Reactions/"))
+                Reactions(file);
+            if (file.Name.Contains("/DifficultyClasses/DifficultyClasses.lsx"))
+                difficulties(file);
+            if ((file.Name.Contains("/Items/_merged.lsf") || file.Name.Contains("/Characters/_merged.lsf") || file.Name.Contains("/RootTemplates/")) && !file.Name.Contains("/Content/"))
+                namesmerged(file);
+            if (file.Name.Contains("/Origins/Origins.lsx"))
+                namesorigins(file);
+            if (file.Name.Contains("/Voice/SpeakerGroups.lsf"))
+                namesspeakergroup(file);
+            if (file.Name.Contains("/Localization/English/Soundbanks/") && file.Name.Contains(".lsf"))
+                aud(file);*/
+
+
 
 
             richTextBoxLog.AppendText("Parsing: " + comboBoxLanguageSelect.Text + ".pak ");
 
-            await Task.Run(() => parsetranslation());
+            await Task.Run(() => ParseTranslation());
             richTextBoxLog.AppendText("- Done\n");
 
             richTextBoxLog.AppendText("Parsing: Gustav.pak ");
             await Task.Run(() => readfiletable("\\Gustav.pak"));
+            await Task.Run(() => Parse.IngestPak(bg3path + "\\Gustav.pak", BgSQLite.dbCommand));
             richTextBoxLog.AppendText("- Done\n");
 
             richTextBoxLog.AppendText("Parsing: Shared.pak ");
             await Task.Run(() => readfiletable("\\Shared.pak"));
+            await Task.Run(() => Parse.IngestPak(bg3path + "\\Shared.pak", BgSQLite.dbCommand));
             richTextBoxLog.AppendText("- Done\n");
 
             foreach (var file in Directory.GetFiles(bg3path))
@@ -1780,6 +1754,7 @@ namespace bg3dialogreader
                 {
                     richTextBoxLog.AppendText("Parsing: " + Path.GetFileName(file) + " ");
                     await Task.Run(() => readfiletable("\\" + Path.GetFileName(file)));
+                    await Task.Run(() => Parse.IngestPak(bg3path + "\\" + Path.GetFileName(file), BgSQLite.dbCommand));
                     richTextBoxLog.AppendText("- Done\n");
                 }
             }
@@ -1788,6 +1763,7 @@ namespace bg3dialogreader
             {
                 richTextBoxLog.AppendText("Parsing: VoiceMeta.pak ");
                 await Task.Run(() => readfiletable("\\Localization\\VoiceMeta.pak"));
+                await Task.Run(() => Parse.IngestPak(bg3path + "\\Localization\\VoiceMeta.pak", BgSQLite.dbCommand));
                 richTextBoxLog.AppendText("- Done\n");
             }
 
@@ -1804,7 +1780,7 @@ namespace bg3dialogreader
 
             watch.Stop();
 
-            DateTime fd = File.GetCreationTime("bg3.db");
+            DateTime fd = File.GetCreationTime(Params.dbFilename);
             labelDBInfo.Text = "(Database created: " + fd.ToString() + ")";
 
             MessageBox.Show("Time: " + watch.Elapsed.TotalSeconds.ToString() + "sec", "Done");
@@ -1836,7 +1812,6 @@ namespace bg3dialogreader
             buttonOpen.Enabled = false;
             buttonLoadTree.Enabled = false;
             buttonExtractDE2.Enabled = false;
-            panelSettings.Enabled = false;
             var watch = Stopwatch.StartNew();
 
             connection.Open();
@@ -1885,7 +1860,6 @@ namespace bg3dialogreader
             buttonLoadTree.Enabled = true;
             comboBoxLanguageSelect.Enabled = true;
             buttonExtractDE2.Enabled = true;
-            panelSettings.Enabled = true;
             sqliteCommand.CommandText = "end";
             sqliteCommand.ExecuteNonQuery();
             watch.Stop();
@@ -1913,7 +1887,7 @@ namespace bg3dialogreader
                 comboBoxLanguageSelect.SelectedItem = comboBoxLanguageSelect.Items[0];
                 buttonCreateDB.Enabled = true;
                 comboBoxLanguageSelect.Enabled = true;
-                if (File.Exists("bg3.db"))
+                if (File.Exists(Params.dbFilename))
                 {
                     buttonExtractHTML.Enabled = true;
                     buttonExtractDE2.Enabled = true;
@@ -2110,189 +2084,6 @@ namespace bg3dialogreader
             }
         }
 
-        private void exportAudioToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            if (File.Exists("vgmstream-cli.exe"))
-            {
-                if (adialogs.Count == 0)
-                {
-                    loadaudiotable();
-                }
-                List<string> dsel = new List<string>();
-                var ddd = "";
-                if (listViewDialog.SelectedItems.Count == 1)
-                {
-                    if (listViewDialog.SelectedItems[0].SubItems[2].Text == "")
-                    {
-                        MessageBox.Show("Selected line do not contain audio files");
-                    }
-                    else
-                    {
-                        ddd = listViewDialog.SelectedItems[0].SubItems[2].Text;
-                        foreach (var item in adialogs)
-                        {
-                            var itemp = item.Split(';');
-                            if (itemp[0].Contains(ddd))
-                            {
-                                extr(itemp[0], itemp[1], itemp[2], itemp[3]);
-                                break;
-                            }
-                        }
-                    }
-                }
-                else if (listViewDialog.SelectedItems.Count > 1)
-                {
-                    for (int i = 0; i < listViewDialog.SelectedItems.Count; i++)
-                    {
-                        if (listViewDialog.SelectedItems[i].SubItems[2].Text == "")
-                        {
-                            continue;
-                        }
-                        else
-                        {
-                            dsel.Add(listViewDialog.SelectedItems[i].SubItems[2].Text);
-
-                        }
-                    }
-                    if (dsel.Count == 0)
-                    {
-                        MessageBox.Show("Selected lines do not contain audio files");
-                    }
-                    foreach (var itemd in dsel)
-                    {
-                        foreach (var item in adialogs)
-                        {
-                            var itemp = item.Split(';');
-                            if (itemp[0].Contains(itemd))
-                            {
-                                extr(itemp[0], itemp[1], itemp[2], itemp[3]);
-                                break;
-                            }
-
-                        }
-
-                    }
-
-                }
-                else
-                    MessageBox.Show("Nothing selected");
-
-                MessageBox.Show("Done");
-            }
-            else
-                MessageBox.Show("vgmstream-cli.exe not found");
-
-
-        }
-
-        private void copyHandleToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            var h = "";
-            List<string> dsel = new List<string>();
-            if (listViewDialog.SelectedItems.Count == 1)
-            {
-                h = "";
-                h = listViewDialog.SelectedItems[0].SubItems[0].Text;
-                Clipboard.SetText(h);
-            }
-            else if (listViewDialog.SelectedItems.Count > 1)
-            {
-                h = "";
-                for (int i = 0; i < listViewDialog.SelectedItems.Count; i++)
-                {
-                    if (listViewDialog.SelectedItems[i].SubItems[0].Text == "")
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        dsel.Add(listViewDialog.SelectedItems[i].SubItems[0].Text);
-                    }
-                }
-                foreach (var item in dsel)
-                {
-                    h += item + Environment.NewLine;
-                }
-                Clipboard.SetText(h);
-            }
-        }
-
-        private void copyDialogLineToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            var h = "";
-            List<string> dsel = new List<string>();
-            if (listViewDialog.SelectedItems.Count == 1)
-            {
-                h = "";
-                h = listViewDialog.SelectedItems[0].SubItems[1].Text;
-                Clipboard.SetText(h);
-            }
-            else if (listViewDialog.SelectedItems.Count > 1)
-            {
-                h = "";
-                for (int i = 0; i < listViewDialog.SelectedItems.Count; i++)
-                {
-                    if (listViewDialog.SelectedItems[i].SubItems[1].Text == "")
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        dsel.Add(listViewDialog.SelectedItems[i].SubItems[1].Text);
-                    }
-                }
-                foreach (var item in dsel)
-                {
-                    h += item + Environment.NewLine;
-                }
-                Clipboard.SetText(h);
-            }
-        }
-
-        private void copyAudioFilenameToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            var h = "";
-            List<string> dsel = new List<string>();
-            if (listViewDialog.SelectedItems.Count == 1)
-            {
-                h = "";
-                h = listViewDialog.SelectedItems[0].SubItems[2].Text;
-                if (h != "")
-                {
-                    Clipboard.SetText(h);
-                }
-
-            }
-            else if (listViewDialog.SelectedItems.Count > 1)
-            {
-                h = "";
-                for (int i = 0; i < listViewDialog.SelectedItems.Count; i++)
-                {
-                    if (listViewDialog.SelectedItems[i].SubItems[2].Text == "")
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        dsel.Add(listViewDialog.SelectedItems[i].SubItems[2].Text);
-                    }
-                }
-                foreach (var item in dsel)
-                {
-                    h += item + Environment.NewLine;
-                }
-                if (h != "")
-                {
-                    Clipboard.SetText(h);
-                }
-            }
-        }
-
-        private void linkLabelNotFoundVGM_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
-        {
-            Process.Start(new ProcessStartInfo("https://github.com/vgmstream/vgmstream/releases") { UseShellExecute = true });
-        }
-
         private void treeViewDialog_NodeMouseClick(object sender, TreeNodeMouseClickEventArgs e)
         {
             if (e.Button == MouseButtons.Right)
@@ -2307,33 +2098,6 @@ namespace bg3dialogreader
             }
         }
 
-        private void listViewDialog_MouseClick(object sender, MouseEventArgs e)
-        {
-            if (e.Button == MouseButtons.Right)
-            {
-                var focusedItem = listViewDialog.FocusedItem;
-                if (focusedItem != null && focusedItem.Bounds.Contains(e.Location))
-                {
-                    contextMenuStripDialogList.Enabled = true;
-                    contextMenuStripDialogList.Show(Cursor.Position);
-                }
-            }
-        }
-
-        private void listViewDialog_DoubleClick(object sender, EventArgs e)
-        {
-            if (File.Exists("vgmstream-cli.exe"))
-            {
-                if (adialogs.Count == 0)
-                {
-                    loadaudiotable();
-                }
-                bplay();
-            }
-            else
-                MessageBox.Show("vgmstream-cli.exe not found");
-        }
-
         private void treeViewDialog_MouseDoubleClick(object sender, MouseEventArgs e)
         {
             connection.Open();
@@ -2341,7 +2105,6 @@ namespace bg3dialogreader
             if (treeViewDialog.SelectedNode != null && treeViewDialog.SelectedNode.Tag != null)
             {
                 labelCurentFilePath.Text = treeViewDialog.SelectedNode.FullPath;
-                listViewDialog.Items.Clear();
 
                 var tags = treeViewDialog.SelectedNode.Tag.ToString().Split(';');
                 string pathfile = bg3path + tags[3];
@@ -2368,27 +2131,6 @@ namespace bg3dialogreader
 
 
                         int nodes = dialog["save"]["regions"]["dialog"]["nodes"][0]["node"].Count();
-                        foreach (var item in values)
-                        {
-                            if (item.Key.Contains("TagText.handle"))
-                            {
-                                ListViewItem lvi = listViewDialog.Items.Add(item.Value);
-                                sqliteCommand.CommandText = "SELECT * FROM tagsflags WHERE uuid=@uuid";
-                                sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", item.Value));
-                                using (SqliteDataReader reader = sqliteCommand.ExecuteReader())
-                                {
-                                    if (reader.HasRows)
-                                    {
-                                        while (reader.Read())
-                                        {
-                                            lvi.SubItems.Add(reader.GetValue(1).ToString());
-                                            lvi.SubItems.Add(reader.GetValue(2).ToString());
-                                        }
-                                    }
-                                }
-                                sqliteCommand.Parameters.Clear();
-                            }
-                        }
                     }
                 }
             }
@@ -2405,27 +2147,6 @@ namespace bg3dialogreader
                 }
 
             }
-        }
-
-        private void listViewDialog_MouseDown(object sender, MouseEventArgs e)
-        {
-            if (e.Button == MouseButtons.Right)
-            {
-                if (listViewDialog.HitTest(e.Location).Item == null)
-                {
-                    contextMenuStripDialogList.Enabled = false;
-                }
-
-            }
-        }
-
-        private void linkLabelSettings_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
-        {
-            if (!panelSettings.Visible)
-                panelSettings.Visible = true;
-            else
-                panelSettings.Visible = false;
-
         }
 
     }
