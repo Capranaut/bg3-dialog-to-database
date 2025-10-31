@@ -262,16 +262,73 @@ namespace bg3dialog2db
             }
         }
 
+        static public void IngestReactions(XmlNode reactNode, Dictionary<string,string> ParrentDict, string Source)
+        {
+            if (!NodeIs(reactNode, "Reaction"))
+            {
+                throw new ArgumentException("Node passed to Parse.Reactions is not a Reaction node");
+            }
+            BgSQLite.LoadCom("INSERT or REPLACE INTO Reactions VALUES (@UUID,@id,@value,@Scope,@Source)");
+            Dictionary<string, string> ReactDict = Fetch.Properties(reactNode);
+            Que.PropertyValue(ReactDict, "id");//str
+            Que.PropertyValue(ReactDict, "value", true);//int
+            Que.PropertyValue(ParrentDict, "UUID");//str
+            Que.PropertyValue(ParrentDict, "Scope", true);//int
+            Que.AddValue("Source", Source);
+            BgSQLite.ExecuteNonQuery();
+        }
+
         static public void IngestReactions(PackagedFileInfo pakFile)
         {
             XmlDocument pakDoc = Fetch.XML(pakFile);
             XmlNode ReactNode = Fetch.Node(pakDoc, "/save/region/node/children/node");
+            if (!NodeIs(ReactNode, "Reaction"))
+            {
+                throw new ArgumentException("Node passed to Parse.Reactions is not a Reaction node");
+            }
+            Dictionary<string, string> ReactDict = Fetch.Properties(ReactNode);
+
+            XmlNode MidNode = Descend(ReactNode);
+
+            if (MidNode == null)
+            {
+                BgSQLite.LoadCom("INSERT or REPLACE INTO Reactions VALUES (@UUID,null,null,@Scope,@Source)");
+                Que.PropertyValue(ReactDict, "UUID");//str
+                Que.PropertyValue(ReactDict, "Scope", true);//int
+                Que.AddValue("Source", pakFile.Name);
+                BgSQLite.ExecuteNonQuery();
+
+                return; //some just seem to be blank: a52602f6-61ec-413b-a6c3-991d2e451a13
+            }
+
+            if (MidNode.ChildNodes.Count != 1 || !NodeIs(MidNode.FirstChild, "Reactions"))
+            {
+                throw new ArgumentException("Node passed to Parse.Reactions has unexpected format");
+            }
+
+            foreach (XmlNode SubNode in MidNode.FirstChild.FirstChild.ChildNodes)
+            {
+                IngestReactions(SubNode, ReactDict, pakFile.Name);
+            }
         }
 
-        static public void IngestDC(PackagedFileInfo pakFile)
+        static public void IngestDC(PackagedFileInfo pakFile)//come back later for strickter checks across the board and hopefully broader scraping built off region id checks
         {
             XmlDocument pakDoc = Fetch.XML(pakFile);
             XmlNode DiffNode = Fetch.Node(pakDoc, "/save/region/node/children");
+
+            foreach (XmlNode DCNode in DiffNode.ChildNodes)
+            {
+                if (!NodeIs(DCNode, "DifficultyClass"))
+                {
+                    throw new ArgumentException("Node passed to Parse.DC is not a DC node");
+                }
+                BgSQLite.LoadCom("INSERT or REPLACE INTO DC VALUES (@UUID,@Name,@Difficulties,@Source)");
+                Dictionary<string, string> DCDict = Fetch.Properties(DCNode);
+                Que.BatchPropertyValues(DCDict, new string[] { "UUID", "Name", "Difficulties" });//Don't ask my why Difficulties is str
+                Que.AddValue("Source", pakFile.Name);
+                BgSQLite.ExecuteNonQuery();
+            }
         }
 
         static public void IngestNamesMerged(PackagedFileInfo pakFile)

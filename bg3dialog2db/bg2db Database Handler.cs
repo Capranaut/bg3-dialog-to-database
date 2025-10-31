@@ -41,7 +41,7 @@ namespace bg3dialog2db
 
         public static void Delete()
         {
-            File.Delete(dbFilename); //System.IO.IOException TODO build soft catch
+            File.Delete(dbFilename); //System.IO.IOException TODO build soft catch URGENT
         }
 
         public static string Age()
@@ -79,21 +79,6 @@ namespace bg3dialog2db
         {
             dbCommand.Parameters.Add(new SqliteParameter($"@{key}", val));
         }
-
-        /*public static void LoadParam(string key, string val)
-        {
-            dbCommand.Parameters.Add(new SqliteParameter($"@{key}", val));
-        }
-
-        public static void LoadParam(string key, int val)
-        {
-            dbCommand.Parameters.Add(new SqliteParameter($"@{key}", val));
-        }
-
-        public static void LoadParam(string key, bool val)
-        {
-            dbCommand.Parameters.Add(new SqliteParameter($"@{key}", val));
-        }*/
 
         public static void ExecuteNonQuery()
         {
@@ -148,7 +133,6 @@ namespace bg3dialog2db
                 "id TEXT, " +
                 "value TEXT, " +
                 "Source TEXT)");
-            //ExecuteCommand("CREATE UNIQUE INDEX CategoryIDX ON Categories(UUID)");
 
             ExecuteCommand("CREATE TABLE Flags (" +
                 "UUID TEXT, " +
@@ -209,6 +193,20 @@ namespace bg3dialog2db
                 "UnlockDisable INT, " +
                 "Source TEXT)");
             ExecuteCommand("CREATE UNIQUE INDEX QuestStepIDX ON QuestSteps(UUID)");
+
+            ExecuteCommand("CREATE TABLE Reactions (" +
+                "UUID TEXT, " +
+                "id TEXT, " +
+                "value int, " +
+                "Scope int, " + 
+                "Source TEXT)");
+
+            ExecuteCommand("CREATE TABLE DC (" +
+                "UUID TEXT, " +
+                "Name TEXT, " +
+                "Difficulties TEXT, " +
+                "Source TEXT)");
+            ExecuteCommand("CREATE UNIQUE INDEX DCIdx ON DC(UUID)");
 
             dbInitialized = true;
         }
