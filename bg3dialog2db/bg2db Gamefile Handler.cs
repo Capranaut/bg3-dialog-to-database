@@ -1,10 +1,12 @@
 ﻿using LSLib.LS;
 using LSLib.LS.Enums;
 using LSLib.LS.Story;
+using LSLib.LS.Story.HeaderParser;
 using Microsoft.Data.Sqlite;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Policy;
@@ -54,7 +56,19 @@ namespace bg3dialog2db
             }
         }
 
-        //Cue a key-value pair for database insertion from an XML node attribute after null check and optional int conversion
+        //Cue a key-value pair for database insertion from an XML node attribute after null check and optional int conversion from direct XML read
+        static public void PropertyValue(XmlNode QueNode, string QueAttributeName, bool QueInt = false)
+        {
+            XmlNode ValNode = QueNode.Attributes.GetNamedItem(QueAttributeName);
+            if (ValNode != null)
+            {
+                AddValue(QueAttributeName, ValNode.Value, QueInt);
+            }
+        //blank handeling
+        return;
+        }
+
+        //Cue a key-value pair for database insertion from an XML node attribute after null check and optional int conversion from dict read
         static public void PropertyValue(Dictionary<string, string> QueNodeDict, string QueAttributeName, bool QueInt = false)
         {
             if (QueNodeDict.TryGetValue(QueAttributeName, out string QueAttributeValue))
@@ -65,7 +79,16 @@ namespace bg3dialog2db
             BgSQLite.LoadNull(QueAttributeName);
         }
 
-        //Cue a batch of key-value pairs for database insertion from XML node attributes after null check - assumes all strings
+        //Cue a batch of key-value pairs for database insertion from XML node attributes after null check from direct XML read - assumes all strings
+        static public void PropertyValueStrings(XmlNode QueNode, string[] QueAttributes)
+        {
+            foreach (string QueAttribute in QueAttributes)
+            {
+                PropertyValue(QueNode, QueAttribute);
+            }
+        }
+
+        //Cue a batch of key-value pairs for database insertion from XML node attributes after null check from dict read - assumes all strings
         static public void PropertyValueStrings(Dictionary<string, string> QueNodeDict, string[] QueAttributes)
         {
             foreach (string QueAttribute in QueAttributes)
@@ -82,20 +105,60 @@ namespace bg3dialog2db
             return (Node.Attributes.GetNamedItem("id").Value == TargetID);
         }
 
+        static void IngestMeta(XmlNode MetaNode, string TagUUID, string Source)
+        {
+            if (MetaNode.FirstChild == null)
+            {
+                return;//TODO log empy cat
+            }
+
+            foreach (XmlNode SubNode in MetaNode.FirstChild.ChildNodes)
+            {
+                string TagID = SubNode.Attributes.GetNamedItem("id").Value;//Uncaught, becuase if there's something there, surely it has an ID right?
+                XmlNode SubNodePayload = SubNode.FirstChild;
+                if (!NodeIs(SubNodePayload, "Name"))
+                {
+                    throw new ArgumentException("Node passed to Parse.Meta contains an attribute other than name");
+                }
+
+                BgSQLite.LoadCom("INSERT or REPLACE INTO Meta VALUES (@UUID,@id,@value,@Source)");
+                Que.AddValue("UUID", TagUUID);
+                Que.AddValue("id", TagID);
+                Que.AddValue("Source", Source);
+                Que.PropertyValue(SubNodePayload, "value");
+                BgSQLite.ExecuteNonQuery();
+            }
+        }
+
+        static void IngestMetas(XmlNode MetasNode, string TagUUID, string Source)
+        {
+            if (MetasNode == null || !MetasNode.HasChildNodes)
+            {
+                return;//TODO Some Logging. That specific file didn't have any
+            }
+            foreach (XmlNode MetaNode in MetasNode.ChildNodes)
+            {
+                IngestMeta(MetaNode, TagUUID, Source);
+            }
+            
+        }
+
         static public void IngestTags(PackagedFileInfo pakFile)
         {
             XmlDocument pakDoc = Fetch.LSX_XML_Conditional(pakFile);
-            XmlNode TagNode = Fetch.Node(pakDoc);
+            XmlNode TagNode = Fetch.Node(pakDoc, "/save/region/node");
             if (!NodeIs(TagNode, "Tags"))
             {
                 throw new ArgumentException("Node passed to Parse.Tags is not a Tag node");
             }
             BgSQLite.LoadCom("INSERT or REPLACE INTO Tags VALUES (@UUID,@Name,@DisplayName,@DisplayDescription,@Icon,@Description,@Source)");
-            Dictionary<string, string> FlagDict = Fetch.Properties(TagNode);
-            Que.PropertyValueStrings(FlagDict, new string[] { "UUID", "Name", "DisplayName", "DisplayDescription", "Icon", "Description" });
+            Dictionary<string, string> TagDict = Fetch.Properties(TagNode);
+            Que.PropertyValueStrings(TagDict, new string[] { "UUID", "Name", "DisplayName", "DisplayDescription", "Icon", "Description" });
             Que.AddValue("Source", pakFile.Name);
             BgSQLite.ExecuteNonQuery();
 
+            XmlNode MetasNode = Fetch.Node(pakDoc, "/save/region/node/children");
+            IngestMetas(MetasNode, TagDict["UUID"], pakFile.Name);
         }
 
         static public void IngestFlags(PackagedFileInfo pakFile)

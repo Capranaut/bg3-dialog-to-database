@@ -145,7 +145,7 @@ namespace bg3dialog2db
             {
                 Dictionary<string, string> OutDict = new();
                 XmlNode key;
-            XmlNode val;
+                XmlNode val;
                 XmlAttributeCollection guts;
 
                 foreach (XmlNode ChildNode in RootNode.ChildNodes)
@@ -235,10 +235,7 @@ namespace bg3dialog2db
         {
             return pakDoc.DocumentElement.SelectSingleNode(nodePath);
         }
-        
-
     }
-
 
     public static class Utilities //phase out
     {
@@ -264,9 +261,7 @@ namespace bg3dialog2db
         {
             return (Node.Name == "attribute" && NodeIdIs(Node, SearchID));
         }
-
         
-
         public static string[] GetNodeVal(XmlNodeList Nodes, string[] Find, string[] Get, bool forceAll = false, bool forceUnique = false)
         {
             int len = Find.Length;
@@ -297,35 +292,5 @@ namespace bg3dialog2db
             
             return values;
         }
-        /* Until I'm sure there are cases where there couldn't be multiple hits
-                public static XmlNode GetNode(XmlNodeList Nodes, string Find)
-                {
-                    foreach (XmlNode Node in Nodes)
-                    {
-                        if (NodeIdIs(Node, Find))
-                        { 
-                            return Node;
-
-                        }
-                    }
-
-                    throw new System.Collections.Generic.KeyNotFoundException("GetNode search miss");
-                }
-
-                //Overload of the above function
-                public static XmlNode GetNode(XmlNode Nodes, string Find)
-                {
-                    foreach (XmlNode Node in Nodes)
-                    {
-                        if (NodeIdIs(Node, Find))
-                        {
-                            return Node;
-
-                        }
-                    }
-
-                    throw new System.Collections.Generic.KeyNotFoundException("GetNode search miss");
-                }
-        */ 
     }
 }

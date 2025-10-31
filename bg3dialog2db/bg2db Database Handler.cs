@@ -129,12 +129,12 @@ namespace bg3dialog2db
             Delete();
             Open();
 
-            ExecuteCommand("CREATE TABLE Categories (" +
+            ExecuteCommand("CREATE TABLE Meta (" +
                 "UUID TEXT, " +
-                "Name TEXT, " +
-                "Value TEXT, " +
+                "id TEXT, " +
+                "value TEXT, " +
                 "Source TEXT)");
-            ExecuteCommand("CREATE UNIQUE INDEX CategoryIDX ON Categories(UUID)");
+            //ExecuteCommand("CREATE UNIQUE INDEX CategoryIDX ON Categories(UUID)");
 
             ExecuteCommand("CREATE TABLE Flags (" +
                 "UUID TEXT, " +
