@@ -91,7 +91,7 @@ namespace bg3dialog2db
                         sqliteCommand.Parameters.Clear();
                     }
 
-                    sqliteCommand.CommandText = "INSERT or REPLACE INTO LocLangTable VALUES (@handle,@text)";
+                    sqliteCommand.CommandText = "INSERT or REPLACE INTO aTable VALUES (@handle,@text,null)";
                     foreach (var entry in locReader.Entries)
                     {
                         sqliteCommand.Parameters.Add(new SqliteParameter("@handle", entry.Key));
@@ -172,10 +172,11 @@ namespace bg3dialog2db
                 sqliteCommand.ExecuteNonQuery();
                 sqliteCommand.Parameters.Clear();
 
-                sqliteCommand.CommandText = "INSERT or REPLACE INTO LookupTable VALUES (@uuid,@text)";
+                sqliteCommand.CommandText = "INSERT or REPLACE INTO bTable VALUES (@uuid,@text,@desc)";
 
                 sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", entry.Key));
                 sqliteCommand.Parameters.Add(new SqliteParameter("@text", entry.Value));
+                sqliteCommand.Parameters.Add(new SqliteParameter("@desc", DBNull.Value));
 
                 sqliteCommand.ExecuteNonQuery();
                 sqliteCommand.Parameters.Clear();
@@ -329,6 +330,15 @@ namespace bg3dialog2db
 
                 sqliteCommand.ExecuteNonQuery();
                 sqliteCommand.Parameters.Clear();
+
+                sqliteCommand.CommandText = "INSERT or REPLACE INTO cTable VALUES (@uuid,@text,@desc)";
+
+                sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", uuid));
+                sqliteCommand.Parameters.Add(new SqliteParameter("@text", stringname));
+                sqliteCommand.Parameters.Add(new SqliteParameter("@desc", desc));
+
+                sqliteCommand.ExecuteNonQuery();
+                sqliteCommand.Parameters.Clear();
             }
         }
         private void Reactions(PackagedFileInfo file)
@@ -430,6 +440,14 @@ namespace bg3dialog2db
                 sqliteCommand.ExecuteNonQuery();
                 sqliteCommand.Parameters.Clear();
 
+                sqliteCommand.CommandText = "INSERT or REPLACE INTO dTable VALUES (@uuid,@text,@desc)";
+                sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", uuid));
+                sqliteCommand.Parameters.Add(new SqliteParameter("@text", diff));
+                sqliteCommand.Parameters.Add(new SqliteParameter("@desc", stringname));
+
+                sqliteCommand.ExecuteNonQuery();
+                sqliteCommand.Parameters.Clear();
+
             }
         }
         private void questflags(PackagedFileInfo file)
@@ -478,7 +496,7 @@ namespace bg3dialog2db
                             sqliteCommand.ExecuteNonQuery();
                             sqliteCommand.Parameters.Clear();
 
-                            sqliteCommand.CommandText = "INSERT or REPLACE INTO TestTable VALUES (@uuid,@text,@desc)";
+                            sqliteCommand.CommandText = "INSERT or REPLACE INTO eTable VALUES (@uuid,@text,@desc)";
                             sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", uuid));
                             sqliteCommand.Parameters.Add(new SqliteParameter("@text", stringname));
                             sqliteCommand.Parameters.Add(new SqliteParameter("@desc", desc2));
@@ -545,6 +563,20 @@ namespace bg3dialog2db
             }
 
             sqliteCommand.CommandText = "INSERT or REPLACE INTO tagsflags VALUES (@handle,@text,@desc) ON CONFLICT(uuid) DO UPDATE SET uuid=excluded.uuid";
+            sqliteCommand.Parameters.Add(new SqliteParameter("@handle", Path.GetFileNameWithoutExtension(file.Name)));
+            if (stringname != "")
+                sqliteCommand.Parameters.Add(new SqliteParameter("@text", stringname));
+            else
+                sqliteCommand.Parameters.Add(new SqliteParameter("@text", DBNull.Value));
+
+            if (desc != "")
+                sqliteCommand.Parameters.Add(new SqliteParameter("@desc", desc));
+            else
+                sqliteCommand.Parameters.Add(new SqliteParameter("@desc", DBNull.Value));
+            sqliteCommand.ExecuteNonQuery();
+            sqliteCommand.Parameters.Clear();
+
+            sqliteCommand.CommandText = "INSERT or REPLACE INTO gTable VALUES (@handle,@text,@desc) ON CONFLICT(uuid) DO UPDATE SET uuid=excluded.uuid";
             sqliteCommand.Parameters.Add(new SqliteParameter("@handle", Path.GetFileNameWithoutExtension(file.Name)));
             if (stringname != "")
                 sqliteCommand.Parameters.Add(new SqliteParameter("@text", stringname));
@@ -1692,46 +1724,58 @@ namespace bg3dialog2db
             sqliteCommand.CommandText = "CREATE UNIQUE INDEX indx ON tagsflags(uuid)";
             sqliteCommand.ExecuteNonQuery();
 
-            sqliteCommand.CommandText = "CREATE TABLE LocLangTable (uuid text, line text)";
+            sqliteCommand.CommandText = "CREATE TABLE aTable (uuid text, name text, description text)";
             sqliteCommand.ExecuteNonQuery();
-            sqliteCommand.CommandText = "CREATE UNIQUE INDEX LocLangTableIdx ON LocLangTable(uuid)";
-            sqliteCommand.ExecuteNonQuery();
-
-            sqliteCommand.CommandText = "CREATE TABLE TestTable (uuid text, name text, description text)";
-            sqliteCommand.ExecuteNonQuery();
-            sqliteCommand.CommandText = "CREATE UNIQUE INDEX TestTableIdx ON TestTable(uuid)";
+            sqliteCommand.CommandText = "CREATE UNIQUE INDEX aIDX ON aTable(uuid)";
             sqliteCommand.ExecuteNonQuery();
 
-            sqliteCommand.CommandText = "CREATE TABLE LookupTable (uuid text, name text)";
+            sqliteCommand.CommandText = "CREATE TABLE bTable (uuid text, name text, description text)";
             sqliteCommand.ExecuteNonQuery();
-            sqliteCommand.CommandText = "CREATE UNIQUE INDEX LookupTableIdx ON LookupTable(uuid)";
+            sqliteCommand.CommandText = "CREATE UNIQUE INDEX bIDX ON bTable(uuid)";
+            sqliteCommand.ExecuteNonQuery();
+
+            sqliteCommand.CommandText = "CREATE TABLE cTable (uuid text, name text, description text)";
+            sqliteCommand.ExecuteNonQuery();
+            sqliteCommand.CommandText = "CREATE UNIQUE INDEX cIDX ON cTable(uuid)";
+            sqliteCommand.ExecuteNonQuery();
+
+            sqliteCommand.CommandText = "CREATE TABLE dTable (uuid text, name text, description text)";
+            sqliteCommand.ExecuteNonQuery();
+            sqliteCommand.CommandText = "CREATE UNIQUE INDEX dIDX ON dTable(uuid)";
+            sqliteCommand.ExecuteNonQuery();
+
+            sqliteCommand.CommandText = "CREATE TABLE eTable (uuid text, name text, description text)";
+            sqliteCommand.ExecuteNonQuery();
+            sqliteCommand.CommandText = "CREATE UNIQUE INDEX eIDX ON eTable(uuid)";
+            sqliteCommand.ExecuteNonQuery();
+
+            sqliteCommand.CommandText = "CREATE TABLE fTable (uuid text, name text, description text)";
+            sqliteCommand.ExecuteNonQuery();
+            sqliteCommand.CommandText = "CREATE UNIQUE INDEX fIDX ON fTable(uuid)";
+            sqliteCommand.ExecuteNonQuery();
+
+            sqliteCommand.CommandText = "CREATE TABLE gTable (uuid text, name text, description text)";
+            sqliteCommand.ExecuteNonQuery();
+            sqliteCommand.CommandText = "CREATE UNIQUE INDEX gIDX ON gTable(uuid)";
+            sqliteCommand.ExecuteNonQuery();
+
+            sqliteCommand.CommandText = "CREATE TABLE hTable (uuid text, name text, description text)";
+            sqliteCommand.ExecuteNonQuery();
+            sqliteCommand.CommandText = "CREATE UNIQUE INDEX hIDX ON hTable(uuid)";
+            sqliteCommand.ExecuteNonQuery();
+
+            sqliteCommand.CommandText = "CREATE TABLE iTable (uuid text, name text, description text)";
+            sqliteCommand.ExecuteNonQuery();
+            sqliteCommand.CommandText = "CREATE UNIQUE INDEX iIDX ON iTable(uuid)";
+            sqliteCommand.ExecuteNonQuery();
+
+            sqliteCommand.CommandText = "CREATE TABLE jTable (uuid text, name text, description text)";
+            sqliteCommand.ExecuteNonQuery();
+            sqliteCommand.CommandText = "CREATE UNIQUE INDEX jIDX ON jTable(uuid)";
             sqliteCommand.ExecuteNonQuery();
 
             sqliteCommand.CommandText = "begin";
             sqliteCommand.ExecuteNonQuery();
-
-
-
-
-           /* if ((file.Name.Contains("/Tags/") || file.Name.Contains("/Flags/")) && file.Name.Contains(".ls"))
-                tagsflags(file);
-            if (file.Name.Contains("/Story/Journal/quest_prototypes.lsx"))
-                questflags(file);
-            if (file.Name.Contains("/ApprovalRatings/Reactions/"))
-                Reactions(file);
-            if (file.Name.Contains("/DifficultyClasses/DifficultyClasses.lsx"))
-                difficulties(file);
-            if ((file.Name.Contains("/Items/_merged.lsf") || file.Name.Contains("/Characters/_merged.lsf") || file.Name.Contains("/RootTemplates/")) && !file.Name.Contains("/Content/"))
-                namesmerged(file);
-            if (file.Name.Contains("/Origins/Origins.lsx"))
-                namesorigins(file);
-            if (file.Name.Contains("/Voice/SpeakerGroups.lsf"))
-                namesspeakergroup(file);
-            if (file.Name.Contains("/Localization/English/Soundbanks/") && file.Name.Contains(".lsf"))
-                aud(file);*/
-
-
-
 
             richTextBoxLog.AppendText("Parsing: " + comboBoxLanguageSelect.Text + ".pak ");
 
