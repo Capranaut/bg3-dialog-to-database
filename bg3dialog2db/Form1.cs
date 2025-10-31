@@ -101,6 +101,8 @@ namespace bg3dialog2db
                     }
                 }
             }
+            Parse.IngestLocalization(bg3path, locLang);
+
         }
 
         private static void rConvert(Resource resource, MemoryStream outputPath, ResourceFormat format, ResourceConversionParameters conversionParams)
@@ -235,6 +237,22 @@ namespace bg3dialog2db
                     if (DisplayName.StartsWith('h'))
                     {
                         sqliteCommand.CommandText = "SELECT * FROM tagsflags WHERE uuid=@uuid";
+                        sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", DisplayName));
+
+                        using (SqliteDataReader readers = sqliteCommand.ExecuteReader())
+                        {
+                            if (readers.HasRows)
+                            {
+                                while (readers.Read())
+                                {
+                                    dbname = readers.GetValue(1).ToString();
+                                    testdictfound[MapKey] = dbname;
+                                }
+                            }
+                        }
+                        sqliteCommand.Parameters.Clear();
+
+                        sqliteCommand.CommandText = "SELECT * FROM fTable WHERE uuid=@uuid";
                         sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", DisplayName));
 
                         using (SqliteDataReader readers = sqliteCommand.ExecuteReader())
@@ -392,6 +410,22 @@ namespace bg3dialog2db
                         react += "'" + npc[uuid] + " " + stringname + "', ";
                 }
                 sqliteCommand.CommandText = "INSERT or REPLACE INTO tagsflags VALUES (@uuid,@text,@desc) ON CONFLICT(uuid) DO UPDATE SET uuid=excluded.uuid";
+                sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", Path.GetFileNameWithoutExtension(file.Name)));
+
+                if (react == "[")
+                    sqliteCommand.Parameters.Add(new SqliteParameter("@text", DBNull.Value));
+                else
+                {
+                    react = react.Remove(react.Length - 2);
+                    react += "]";
+                    sqliteCommand.Parameters.Add(new SqliteParameter("@text", react));
+                }
+
+                sqliteCommand.Parameters.Add(new SqliteParameter("@desc", DBNull.Value));
+                sqliteCommand.ExecuteNonQuery();
+                sqliteCommand.Parameters.Clear();
+
+                sqliteCommand.CommandText = "INSERT or REPLACE INTO gTable VALUES (@uuid,@text,@desc) ON CONFLICT(uuid) DO UPDATE SET uuid=excluded.uuid";
                 sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", Path.GetFileNameWithoutExtension(file.Name)));
 
                 if (react == "[")
@@ -657,6 +691,12 @@ namespace bg3dialog2db
                     }
 
                     sqliteCommand.CommandText = "UPDATE tagsflags SET description=@desc WHERE uuid=@uuid";
+                    sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", huuid));
+                    sqliteCommand.Parameters.Add(new SqliteParameter("@desc", hsource));
+                    sqliteCommand.ExecuteNonQuery();
+                    sqliteCommand.Parameters.Clear();
+
+                    sqliteCommand.CommandText = "UPDATE hTable SET description=@desc WHERE uuid=@uuid";
                     sqliteCommand.Parameters.Add(new SqliteParameter("@uuid", huuid));
                     sqliteCommand.Parameters.Add(new SqliteParameter("@desc", hsource));
                     sqliteCommand.ExecuteNonQuery();
@@ -1784,12 +1824,12 @@ namespace bg3dialog2db
 
             richTextBoxLog.AppendText("Parsing: Gustav.pak ");
             await Task.Run(() => readfiletable("\\Gustav.pak"));
-            await Task.Run(() => Parse.IngestPak(bg3path + "\\Gustav.pak", BgSQLite.dbCommand));
+            await Task.Run(() => Parse.IngestPak(bg3path + "\\Gustav.pak"));
             richTextBoxLog.AppendText("- Done\n");
 
             richTextBoxLog.AppendText("Parsing: Shared.pak ");
             await Task.Run(() => readfiletable("\\Shared.pak"));
-            await Task.Run(() => Parse.IngestPak(bg3path + "\\Shared.pak", BgSQLite.dbCommand));
+            await Task.Run(() => Parse.IngestPak(bg3path + "\\Shared.pak"));
             richTextBoxLog.AppendText("- Done\n");
 
             foreach (var file in Directory.GetFiles(bg3path))
@@ -1798,7 +1838,7 @@ namespace bg3dialog2db
                 {
                     richTextBoxLog.AppendText("Parsing: " + Path.GetFileName(file) + " ");
                     await Task.Run(() => readfiletable("\\" + Path.GetFileName(file)));
-                    await Task.Run(() => Parse.IngestPak(bg3path + "\\" + Path.GetFileName(file), BgSQLite.dbCommand));
+                    await Task.Run(() => Parse.IngestPak(bg3path + "\\" + Path.GetFileName(file)));
                     richTextBoxLog.AppendText("- Done\n");
                 }
             }
@@ -1807,7 +1847,7 @@ namespace bg3dialog2db
             {
                 richTextBoxLog.AppendText("Parsing: VoiceMeta.pak ");
                 await Task.Run(() => readfiletable("\\Localization\\VoiceMeta.pak"));
-                await Task.Run(() => Parse.IngestPak(bg3path + "\\Localization\\VoiceMeta.pak", BgSQLite.dbCommand));
+                await Task.Run(() => Parse.IngestPak(bg3path + "\\Localization\\VoiceMeta.pak"));
                 richTextBoxLog.AppendText("- Done\n");
             }
 

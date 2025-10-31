@@ -17,7 +17,7 @@ namespace bg3dialog2db
 {
     static public class Que //Database insertion queuing functions
     {
-        
+
         //Null check (also flattens all 0 UUID and larian empty messages to null)
         static bool Forbidden(string ValueString)
         {
@@ -37,46 +37,40 @@ namespace bg3dialog2db
             return false;
         }
 
-        //Cue a null value for database insertion
-        static void AddNull(SqliteCommand DbCom, string QueKey)
-        {
-            DbCom.Parameters.Add(new SqliteParameter($"@{QueKey}", DBNull.Value));
-        }
-
         //Cue a kev-value pair for database insertion after null check and optional int conversion
-        static public void AddValue(SqliteCommand DbCom, string QueKey, string QueVal, bool QueInt = false)
+        static public void AddValue(string QueKey, string QueVal, bool QueInt = false)
         {
             if (Forbidden(QueVal))
             {
-                AddNull(DbCom, QueKey);
+                BgSQLite.LoadNull(QueKey);
             }
             else if (QueInt)
             {
-                DbCom.Parameters.Add(new SqliteParameter($"@{QueKey}", int.Parse(QueVal)));
+                BgSQLite.LoadParam(QueKey, int.Parse(QueVal));
             }
             else
             {
-                DbCom.Parameters.Add(new SqliteParameter($"@{QueKey}", QueVal));
+                BgSQLite.LoadParam(QueKey, QueVal);
             }
         }
 
         //Cue a key-value pair for database insertion from an XML node attribute after null check and optional int conversion
-        static public void PropertyValue(SqliteCommand DbCom, Dictionary<string, string> QueNodeDict, string QueAttributeName, bool QueInt = false)
+        static public void PropertyValue(Dictionary<string, string> QueNodeDict, string QueAttributeName, bool QueInt = false)
         {
             if (QueNodeDict.TryGetValue(QueAttributeName, out string QueAttributeValue))
             {
-                AddValue(DbCom, QueAttributeName, QueAttributeValue, QueInt);
+                AddValue(QueAttributeName, QueAttributeValue, QueInt);
                 return;
             }
-            AddNull(DbCom, QueAttributeName);
+            BgSQLite.LoadNull(QueAttributeName);
         }
 
         //Cue a batch of key-value pairs for database insertion from XML node attributes after null check - assumes all strings
-        static public void PropertyValueStrings(SqliteCommand DbCom, Dictionary<string, string> QueNodeDict, string[] QueAttributes)
+        static public void PropertyValueStrings(Dictionary<string, string> QueNodeDict, string[] QueAttributes)
         {
             foreach (string QueAttribute in QueAttributes)
             {
-                PropertyValue(DbCom, QueNodeDict, QueAttribute);
+                PropertyValue(QueNodeDict, QueAttribute);
             }
         }
     }
@@ -88,13 +82,13 @@ namespace bg3dialog2db
             return (Node.Attributes.GetNamedItem("id").Value == TargetID);
         }
 
-        static public void IngestTags(PackagedFileInfo pakFile, SqliteCommand DbCom)
+        static public void IngestTags(PackagedFileInfo pakFile)
         {
             XmlDocument pakDoc = Fetch.LSX_XML_Conditional(pakFile);
             XmlNode TagNode = Fetch.Node(pakDoc);
         }
 
-        static public void IngestFlags(PackagedFileInfo pakFile, SqliteCommand DbCom)
+        static public void IngestFlags(PackagedFileInfo pakFile)
         {
             XmlDocument pakDoc = Fetch.LSX_XML_Conditional(pakFile);
             XmlNode FlagNode = Fetch.Node(pakDoc);
@@ -102,97 +96,140 @@ namespace bg3dialog2db
             {
                 throw new ArgumentException("Node passed to Parse.Flags is not a Flags node");
             }
-            DbCom.Parameters.Clear();
-            DbCom.CommandText = "INSERT or REPLACE INTO Flags VALUES (@UUID,@Name,@Description,@Usage,@Source)";
+            BgSQLite.Clear();
+            BgSQLite.LoadCom("INSERT or REPLACE INTO Flags VALUES (@UUID,@Name,@Description,@Usage,@Source)");
             Dictionary<string, string> FlagDict = Fetch.Properties(FlagNode);
-            Que.PropertyValueStrings(DbCom, FlagDict, new string[] { "UUID", "Name", "Description" });  
-            Que.PropertyValue(DbCom, FlagDict, "Usage", true);
-            Que.AddValue(DbCom, "Source", pakFile.Name);
-            DbCom.ExecuteNonQuery();
+            Que.PropertyValueStrings(FlagDict, new string[] { "UUID", "Name", "Description" });
+            Que.PropertyValue(FlagDict, "Usage", true);
+            Que.AddValue("Source", pakFile.Name);
+            BgSQLite.ExecuteNonQuery();
         }
 
-        static public void IngestQuests(PackagedFileInfo pakFile, SqliteCommand DbCom)
+        static public void IngestQuests(PackagedFileInfo pakFile)
         {
             XmlDocument pakDoc = Fetch.XML(pakFile);
             XmlNode QuestNode = Fetch.Node(pakDoc, "/save/region/node/children");
         }
 
-        static public void IngestReactions(PackagedFileInfo pakFile, SqliteCommand DbCom)
+        static public void IngestReactions(PackagedFileInfo pakFile)
         {
             XmlDocument pakDoc = Fetch.XML(pakFile);
             XmlNode ReactNode = Fetch.Node(pakDoc, "/save/region/node/children/node");
         }
 
-        static public void IngestDC(PackagedFileInfo pakFile, SqliteCommand DbCom)
+        static public void IngestDC(PackagedFileInfo pakFile)
         {
             XmlDocument pakDoc = Fetch.XML(pakFile);
             XmlNode DiffNode = Fetch.Node(pakDoc, "/save/region/node/children");
         }
 
-        static public void IngestNamesMerged(PackagedFileInfo pakFile, SqliteCommand DbCom)
+        static public void IngestNamesMerged(PackagedFileInfo pakFile)
         {
             XmlDocument pakDoc = Fetch.LSX_XML_Conditional(pakFile);
             XmlNode NameMerdNode = Fetch.Node(pakDoc);
         }
 
-        static public void IngestNamesOrigins(PackagedFileInfo pakFile, SqliteCommand DbCom)
+        static public void IngestNamesOrigins(PackagedFileInfo pakFile)
         {
             XmlDocument pakDoc = Fetch.XML(pakFile);
             XmlNode NameOriNode = Fetch.Node(pakDoc, "/save/region/node/children");
         }
 
-        static public void IngestSpeakerGroups(PackagedFileInfo pakFile, SqliteCommand DbCom)
+        static public void IngestSpeakerGroups(PackagedFileInfo pakFile)
         {
             XmlDocument pakDoc = Fetch.LSX_XML(pakFile);
             XmlNode SpeakGroupNode = Fetch.Node(pakDoc, "/save/region/node/children");
         }
 
-        static public void IngestAudio(PackagedFileInfo pakFile, SqliteCommand DbCom)
+        static public void IngestAudio(PackagedFileInfo pakFile)
         {
             XmlDocument pakDoc = Fetch.LSX_XML(pakFile);
             XmlNode AudNode = Fetch.Node(pakDoc, "/save/region/node/children/node/children/node/children");
         }
 
-        static public void IngestSwitch(PackagedFileInfo pakFile, SqliteCommand DbCom)
+        static public void IngestLang(PackagedFileInfo pakFile)//Called sepeartly from switch
+        {
+            using var pakStream = pakFile.CreateContentReader();
+            var fileExt = LocaUtils.ExtensionToFileFormat(pakFile.Name);
+            var locReader = LocaUtils.Load(pakStream, fileExt);
+
+            BgSQLite.LoadCom("INSERT or REPLACE INTO Localization VALUES (@UUID,@Line)");
+            foreach (var entry in locReader.Entries)
+            {
+                BgSQLite.Clear();
+                BgSQLite.LoadParam("UUID", entry.Key);
+                BgSQLite.LoadParam("Line", entry.Text);
+                BgSQLite.ExecuteNonQuery();
+            }
+        }
+
+        static public void IngestSwitch(PackagedFileInfo pakFile)
         {
             if (PakTest.IsTag(pakFile))
-                IngestTags(pakFile, DbCom);
+                IngestTags(pakFile);
             else if (PakTest.IsFlag(pakFile))
-                IngestFlags(pakFile, DbCom);
+                IngestFlags(pakFile);
             else if (PakTest.IsQuest(pakFile))
-                IngestQuests(pakFile, DbCom);
+                IngestQuests(pakFile);
             else if (PakTest.IsReaction(pakFile))
-                IngestReactions(pakFile, DbCom);
+                IngestReactions(pakFile);
             else if (PakTest.IsDC(pakFile))
-                IngestDC(pakFile, DbCom);
+                IngestDC(pakFile);
             else if (PakTest.IsMerged(pakFile))
-                IngestNamesMerged(pakFile, DbCom);
+                IngestNamesMerged(pakFile);
             else if (PakTest.IsOrigin(pakFile))
-                IngestNamesOrigins(pakFile, DbCom);
+                IngestNamesOrigins(pakFile);
             else if (PakTest.IsSpeakerGroup(pakFile))
-                IngestSpeakerGroups(pakFile, DbCom);
+                IngestSpeakerGroups(pakFile);
             else if (PakTest.IsAudio(pakFile))
-                IngestAudio(pakFile, DbCom);
+                IngestAudio(pakFile);
             else
                 return;//Just to make it explicit
         }
 
-        static public void IngestPak(string pakFilePath, SqliteCommand DbCom)
+        static public void IngestPak(string pakFilePath)
         {
+            BgSQLite.Begin();
             PackageReader pakReader = new();//Invoke LsLib
             using Package pak = pakReader.Read(pakFilePath);
             foreach (PackagedFileInfo pakFile in pak.Files)
             {
                 try
                 {
-                    IngestSwitch(pakFile, DbCom);//Ingest offloaded for error handeling and potential future parallelization
+                    IngestSwitch(pakFile);//Ingest offloaded for error handeling and potential future parallelization
                 }
                 catch (Exception e)
                 {
                     Console.WriteLine($"Error ingesting {pakFile.Name} from {Path.GetFileName(pakFilePath)}: {e.Message}");
                 }
             }
+            BgSQLite.End();
         }
 
+        static public void IngestLocalization(string GamePath, string locLang)
+        {
+            BgSQLite.Begin();
+            string langPakPath = $"{GamePath}\\Localization\\{locLang}\\{locLang}.pak";
+            if (locLang == "English")//Larian just had to have an edge case
+                langPakPath = $"{GamePath}\\Localization\\English.pak";
+
+            PackageReader pakReader = new();//Invoke LsLib
+            using Package pak = pakReader.Read(langPakPath);
+            foreach (PackagedFileInfo pakFile in pak.Files)
+            {
+                if (PakTest.IsLang(pakFile, locLang))
+                {
+                    try
+                    {
+                        IngestLang(pakFile);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"Error ingesting {pakFile.Name} from {Path.GetFileName(langPakPath)}: {e.Message}");
+                    }
+                }
+            }
+            
+        }
     }
 }

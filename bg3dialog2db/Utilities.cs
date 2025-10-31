@@ -42,12 +42,12 @@ namespace bg3dialog2db
 
         public static bool IsReaction(PackagedFileInfo pakFile)
         {
-            return ((pakFile.Name.Contains("/ApprovalRatings/Reactions/")));
+            return (pakFile.Name.Contains("/ApprovalRatings/Reactions/"));
         }
 
         public static bool IsDC(PackagedFileInfo pakFile)
         {
-            return ((pakFile.Name.Contains("/DifficultyClasses/DifficultyClasses.lsx")));
+            return (pakFile.Name.Contains("/DifficultyClasses/DifficultyClasses.lsx"));
         }
 
         public static bool IsItemMerged(PackagedFileInfo pakFile)
@@ -83,6 +83,13 @@ namespace bg3dialog2db
         public static bool IsAudio(PackagedFileInfo pakFile)
         {
             return (pakFile.Name.Contains("/Localization/English/Soundbanks/") && pakFile.Name.Contains(".lsf"));
+        }
+
+        public static bool IsLang(PackagedFileInfo pakFile, string locLang = "English")
+        {
+            return (
+                pakFile.Name.Contains($"/{locLang}/{locLang.ToLower()}.loca") || 
+                pakFile.Name.Contains($"/{locLang}/{locLang.ToLower()}.xml"));
         }
 
         public static bool IsParsable(PackagedFileInfo pakFile)
@@ -123,6 +130,8 @@ namespace bg3dialog2db
                 return "IsSpeakerGroup";
             else if (IsAudio(pakFile))
                 return "IsAudio";
+            else if (IsLang(pakFile))
+                return "IsLang";
             return "IsNone";
         }
     }

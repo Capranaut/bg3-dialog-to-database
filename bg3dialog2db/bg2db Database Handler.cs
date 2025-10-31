@@ -15,9 +15,10 @@ namespace bg3dialog2db
         const string dbConnectionString = $"Data Source={dbFilename}";
 
         static SqliteConnection dbConnection = new(dbConnectionString);
-        public static SqliteCommand dbCommand = new();
+        static SqliteCommand dbCommand = new();
         static bool dbLive = false;
         static bool dbInitialized = false;
+        static bool dbLocked;
 
         public static void Close() //Close if open
         {
@@ -54,6 +55,37 @@ namespace bg3dialog2db
             return "(Database Created: " + fd.ToString() + ")";
         }
 
+        public static void Clear()
+        {
+            dbCommand.Parameters.Clear();
+        }
+
+        public static void LoadCom(string payload)
+        {
+            dbCommand.CommandText = payload;
+        }
+
+        public static void LoadParam(string key, string val)
+        {
+            dbCommand.Parameters.Add(new SqliteParameter($"@{key}", val));
+        }
+
+        public static void LoadParam(string key, int val)
+        {
+            dbCommand.Parameters.Add(new SqliteParameter($"@{key}", val));
+        }
+
+        public static void LoadNull(string key)
+        {
+            dbCommand.Parameters.Add(new SqliteParameter($"@{key}", DBNull.Value));
+        }
+
+        public static void ExecuteNonQuery()
+        {
+            dbCommand.ExecuteNonQuery();
+            Clear();
+        }
+
         public static void Open() //Open if not already open
         {
             if (!dbLive)
@@ -64,12 +96,29 @@ namespace bg3dialog2db
             }
         }
 
-        public static void NQ(string payload) //Prareterless Non-Query
+        public static void ExecuteCommand(string payload) //Prareterless Non-Query
         {
-            Open();
-            dbCommand.Parameters.Clear();
-            dbCommand.CommandText = payload;
-            dbCommand.ExecuteNonQuery();
+            Clear();
+            LoadCom(payload);
+            ExecuteNonQuery();
+        }
+
+        public static void Begin()
+        {
+            if (!dbLocked)
+            {
+                ExecuteCommand("begin");
+                dbLocked = true;
+            }
+        }
+
+        public static void End()
+        {
+            if(dbLocked)
+            {
+                ExecuteCommand("end");
+                dbLocked = false;
+            }
         }
 
         public static void Make()
@@ -79,22 +128,22 @@ namespace bg3dialog2db
             Delete();
             Open();
 
-            NQ("CREATE TABLE Categories (" +
+            ExecuteCommand("CREATE TABLE Categories (" +
                 "UUID TEXT, " +
                 "Name TEXT, " +
                 "Value TEXT, " +
                 "Source TEXT)");
-            NQ("CREATE UNIQUE INDEX CategoryIDX ON Categories(UUID)");
+            ExecuteCommand("CREATE UNIQUE INDEX CategoryIDX ON Categories(UUID)");
 
-            NQ("CREATE TABLE Flags (" +
+            ExecuteCommand("CREATE TABLE Flags (" +
                 "UUID TEXT, " +
                 "Name TEXT, " +
                 "Description TEXT, " +
                 "Usage INTEGER, " +
                 "Source TEXT)");
-            NQ("CREATE UNIQUE INDEX FlagIDX ON Flags(UUID)");
+            ExecuteCommand("CREATE UNIQUE INDEX FlagIDX ON Flags(UUID)");
 
-            NQ("CREATE TABLE Tags (" +
+            ExecuteCommand("CREATE TABLE Tags (" +
                 "UUID TEXT, " +
                 "Name TEXT, " +
                 "DisplayName TEXT, " +
@@ -102,7 +151,12 @@ namespace bg3dialog2db
                 "Icon TEXT, " +
                 "Description TEXT, " +
                 "Source TEXT)");
-            NQ("CREATE UNIQUE INDEX TagIDX ON Tags(UUID)");
+            ExecuteCommand("CREATE UNIQUE INDEX TagIDX ON Tags(UUID)");
+
+            ExecuteCommand("CREATE TABLE Localization (" +
+                "UUID TEXT, " +
+                "Line TEXT)");
+            ExecuteCommand("CREATE UNIQUE INDEX LocIDX ON Localization(UUID)");
 
             dbInitialized = true;
         }
