@@ -173,13 +173,13 @@ namespace bg3dialog2db
                 "Line TEXT)");
             ExecuteCommand("CREATE UNIQUE INDEX LocIDX ON Localization(UUID)");
 
-            ExecuteCommand("CREATE TABLE Quests (" +
+            ExecuteCommand("CREATE TABLE Quests (" + //Vis is bool
                 "UUID TEXT, " +
                 "QuestID TEXT, " +
                 "QuestTitle TEXT, " +
                 "CategoryID TEXT, " +
                 "ParentQuestID TEXT, " +
-                "QuestVisiblity BOOL, " +
+                "QuestVisiblity INT, " +
                 "QuestRewardTarget INT, " +
                 "SortingPriority INT, " +
                 "Source TEXT)");

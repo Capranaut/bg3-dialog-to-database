@@ -53,7 +53,7 @@ namespace bg3dialog2db
                 BgSQLite.LoadParam(QueKey, int.Parse(QueVal));
             }
             else if (QueBool)
-            {
+            {//Problem for the future
                 BgSQLite.LoadParam(QueKey, bool.Parse(QueVal));
             }
             else
@@ -116,19 +116,12 @@ namespace bg3dialog2db
             return ParentNode.SelectSingleNode("children");
         }
 
-        static void IngestMeta(XmlNode MetaNode, string TagUUID, string Source)
+        static void IngestMeta(XmlNode SubNode, string TagUUID, string Source)
         {
-            if (MetaNode.FirstChild == null)
-            {
-                return;//TODO log empy cat
-            }
-
-            foreach (XmlNode SubNode in MetaNode.FirstChild.ChildNodes)
-            {
                 string TagID = SubNode.Attributes.GetNamedItem("id").Value;//Uncaught, becuase if there's something there, surely it has an ID right?
                 XmlNode SubNodePayload = SubNode.FirstChild;
 
-                if (!NodeIs(SubNodePayload, "Name"))//FIX FOR QUEST METAS HAVING WEIRD EXTRA ATTRIBUTES
+                if (!NodeIs(SubNodePayload, "Name") && !NodeIs(SubNodePayload, TagID))
                 {
                     throw new ArgumentException("Node passed to Parse.Meta contains an attribute other than name");
                 }
@@ -139,18 +132,26 @@ namespace bg3dialog2db
                 Que.AddValue("Source", Source);
                 Que.PropertyValue(SubNodePayload, "value");
                 BgSQLite.ExecuteNonQuery();
-            }
         }
 
-        static void IngestMetas(XmlNode MetasNode, string TagUUID, string Source)
+        static void MetaManager(XmlNode MetasNode, string TagUUID, string Source)
         {
             if (MetasNode == null || !MetasNode.HasChildNodes)
             {
                 return;//TODO Some Logging. That specific file didn't have any
             }
+
             foreach (XmlNode MetaNode in MetasNode.ChildNodes)
             {
-                IngestMeta(MetaNode, TagUUID, Source);
+                if (MetaNode.FirstChild == null)
+                {
+                    return;//TODO log empy cat
+                }
+
+                foreach (XmlNode SubNode in MetaNode.FirstChild.ChildNodes)
+                {
+                    IngestMeta(SubNode, TagUUID, Source);
+                }
             }
 
         }
@@ -169,7 +170,7 @@ namespace bg3dialog2db
             Que.AddValue("Source", pakFile.Name);
             BgSQLite.ExecuteNonQuery();
 
-            IngestMetas(Descend(TagNode), TagDict["UUID"], pakFile.Name);
+            MetaManager(Descend(TagNode), TagDict["UUID"], pakFile.Name);
         }
 
         static public void IngestFlags(PackagedFileInfo pakFile)
@@ -190,7 +191,7 @@ namespace bg3dialog2db
 
         static public void IngestQuestSteps(XmlNode StepsNode, string QuestUUID, string Source)
         {
-            /*if (StepsNode == null || !StepsNode.HasChildNodes)
+            if (StepsNode == null || !StepsNode.HasChildNodes)
             {
                 throw new ArgumentException("Stepless quest");
             }
@@ -198,7 +199,7 @@ namespace bg3dialog2db
             {
                 if (NodeIs(SubNode, "SubQuests"))
                 {
-                    IngestMetas(SubNode, QuestUUID, Source);
+                    IngestMeta(SubNode, QuestUUID, Source);
                 }
 
                 else if (!NodeIs(SubNode, "QuestStep"))
@@ -228,12 +229,10 @@ namespace bg3dialog2db
                     BgSQLite.ExecuteNonQuery();
                 }
             }
-            */
         }
 
         static public void IngestQuests(PackagedFileInfo pakFile)
         {
-            /*
             XmlDocument pakDoc = Fetch.XML(pakFile);
             XmlNode QuestNodes = Fetch.Node(pakDoc, "/save/region/node");
             if (!NodeIs(QuestNodes, "root"))
@@ -261,7 +260,6 @@ namespace bg3dialog2db
 
                 IngestQuestSteps(Descend(QuestNode), QuestDict["QuestGuid"], pakFile.Name);
             }
-            */
         }
 
         static public void IngestReactions(PackagedFileInfo pakFile)
