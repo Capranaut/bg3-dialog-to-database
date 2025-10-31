@@ -111,18 +111,24 @@ namespace bg3dialog2db
             return (Node.Attributes.GetNamedItem("id").Value == TargetID);
         }
 
+        static XmlNode Descend(XmlNode ParentNode)
+        {
+            return ParentNode.SelectSingleNode("children");
+        }
+
         static void IngestMeta(XmlNode MetaNode, string TagUUID, string Source)
         {
             if (MetaNode.FirstChild == null)
             {
                 return;//TODO log empy cat
-        }
+            }
 
             foreach (XmlNode SubNode in MetaNode.FirstChild.ChildNodes)
-        {
+            {
                 string TagID = SubNode.Attributes.GetNamedItem("id").Value;//Uncaught, becuase if there's something there, surely it has an ID right?
                 XmlNode SubNodePayload = SubNode.FirstChild;
-                if (!NodeIs(SubNodePayload, "Name"))
+
+                if (!NodeIs(SubNodePayload, "Name"))//FIX FOR QUEST METAS HAVING WEIRD EXTRA ATTRIBUTES
                 {
                     throw new ArgumentException("Node passed to Parse.Meta contains an attribute other than name");
                 }
@@ -130,10 +136,10 @@ namespace bg3dialog2db
                 BgSQLite.LoadCom("INSERT or REPLACE INTO Meta VALUES (@UUID,@id,@value,@Source)");
                 Que.AddValue("UUID", TagUUID);
                 Que.AddValue("id", TagID);
-            Que.AddValue("Source", Source);
+                Que.AddValue("Source", Source);
                 Que.PropertyValue(SubNodePayload, "value");
-            BgSQLite.ExecuteNonQuery();
-        }
+                BgSQLite.ExecuteNonQuery();
+            }
         }
 
         static void IngestMetas(XmlNode MetasNode, string TagUUID, string Source)
@@ -145,9 +151,9 @@ namespace bg3dialog2db
             foreach (XmlNode MetaNode in MetasNode.ChildNodes)
             {
                 IngestMeta(MetaNode, TagUUID, Source);
-                }
+            }
 
-                }
+        }
 
         static public void IngestTags(PackagedFileInfo pakFile)
         {
@@ -184,7 +190,7 @@ namespace bg3dialog2db
 
         static public void IngestQuestSteps(XmlNode StepsNode, string QuestUUID, string Source)
         {
-            if (StepsNode == null || !StepsNode.HasChildNodes)
+            /*if (StepsNode == null || !StepsNode.HasChildNodes)
             {
                 throw new ArgumentException("Stepless quest");
             }
@@ -222,11 +228,12 @@ namespace bg3dialog2db
                     BgSQLite.ExecuteNonQuery();
                 }
             }
-
+            */
         }
 
         static public void IngestQuests(PackagedFileInfo pakFile)
         {
+            /*
             XmlDocument pakDoc = Fetch.XML(pakFile);
             XmlNode QuestNodes = Fetch.Node(pakDoc, "/save/region/node");
             if (!NodeIs(QuestNodes, "root"))
@@ -254,6 +261,7 @@ namespace bg3dialog2db
 
                 IngestQuestSteps(Descend(QuestNode), QuestDict["QuestGuid"], pakFile.Name);
             }
+            */
         }
 
         static public void IngestReactions(PackagedFileInfo pakFile)
