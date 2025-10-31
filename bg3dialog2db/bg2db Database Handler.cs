@@ -62,6 +62,7 @@ namespace bg3dialog2db
 
         public static void LoadCom(string payload)
         {
+            Clear();
             dbCommand.CommandText = payload;
         }
 

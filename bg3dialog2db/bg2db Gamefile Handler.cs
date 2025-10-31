@@ -86,6 +86,16 @@ namespace bg3dialog2db
         {
             XmlDocument pakDoc = Fetch.LSX_XML_Conditional(pakFile);
             XmlNode TagNode = Fetch.Node(pakDoc);
+            if (!NodeIs(TagNode, "Tags"))
+            {
+                throw new ArgumentException("Node passed to Parse.Tags is not a Tag node");
+            }
+            BgSQLite.LoadCom("INSERT or REPLACE INTO Tags VALUES (@UUID,@Name,@DisplayName,@DisplayDescription,@Icon,@Description,@Source)");
+            Dictionary<string, string> FlagDict = Fetch.Properties(TagNode);
+            Que.PropertyValueStrings(FlagDict, new string[] { "UUID", "Name", "DisplayName", "DisplayDescription", "Icon", "Description" });
+            Que.AddValue("Source", pakFile.Name);
+            BgSQLite.ExecuteNonQuery();
+
         }
 
         static public void IngestFlags(PackagedFileInfo pakFile)
@@ -96,7 +106,6 @@ namespace bg3dialog2db
             {
                 throw new ArgumentException("Node passed to Parse.Flags is not a Flags node");
             }
-            BgSQLite.Clear();
             BgSQLite.LoadCom("INSERT or REPLACE INTO Flags VALUES (@UUID,@Name,@Description,@Usage,@Source)");
             Dictionary<string, string> FlagDict = Fetch.Properties(FlagNode);
             Que.PropertyValueStrings(FlagDict, new string[] { "UUID", "Name", "Description" });
@@ -156,7 +165,6 @@ namespace bg3dialog2db
             BgSQLite.LoadCom("INSERT or REPLACE INTO Localization VALUES (@UUID,@Line)");
             foreach (var entry in locReader.Entries)
             {
-                BgSQLite.Clear();
                 BgSQLite.LoadParam("UUID", entry.Key);
                 BgSQLite.LoadParam("Line", entry.Text);
                 BgSQLite.ExecuteNonQuery();

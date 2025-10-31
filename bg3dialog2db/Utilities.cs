@@ -144,8 +144,8 @@ namespace bg3dialog2db
             static public Dictionary<string, string> Properties(XmlNode RootNode)
             {
                 Dictionary<string, string> OutDict = new();
-                string key;
-                string val;
+                XmlNode key;
+            XmlNode val;
                 XmlAttributeCollection guts;
 
                 foreach (XmlNode ChildNode in RootNode.ChildNodes)
@@ -154,13 +154,13 @@ namespace bg3dialog2db
                     {
                         guts = ChildNode.Attributes;
 
-                        key = guts.GetNamedItem("id").Value;
-                        val = guts.GetNamedItem("value").Value;
+                        key = guts.GetNamedItem("id");
+                        val = guts.GetNamedItem("value");
 
                         if (val is null)
-                            val = guts.GetNamedItem("handle").Value;
+                            val = guts.GetNamedItem("handle");
 
-                        OutDict[key] = val;
+                        OutDict[key.Value] = val.Value;
                     }
                 }
                 return OutDict;
