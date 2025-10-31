@@ -18,7 +18,8 @@ namespace bg3dialog2db
         public static readonly string dbFilename = "BG3 Dialog Database.db";//In final build shift params from database handler here
         public static readonly string dbConnectionString = $"Data Source={dbFilename}";
 
-        public static readonly string[] NullStringArray = ["", " ", "NULL", "null", "Null", "-1", 
+        public static readonly string[] NullStringArray = [
+            "", " ", "NULL", "null", "Null", 
             "ls::TranslatedStringRepository::s_HandleUnknown",
             "00000000-0000-0000-0000-000000000000"];
     }
@@ -37,7 +38,7 @@ namespace bg3dialog2db
 
         public static bool IsQuest(PackagedFileInfo pakFile)
         {
-            return (pakFile.Name.Contains("//Story/Journal/quest_prototypes.lsx"));
+            return (pakFile.Name.Contains("/Story/Journal/quest_prototypes.lsx"));
         }
 
         public static bool IsReaction(PackagedFileInfo pakFile)

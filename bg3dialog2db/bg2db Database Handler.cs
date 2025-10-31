@@ -65,8 +65,22 @@ namespace bg3dialog2db
             Clear();
             dbCommand.CommandText = payload;
         }
+        public static void LoadNull(string key)
+        {
+            dbCommand.Parameters.Add(new SqliteParameter($"@{key}", DBNull.Value));
+        }
 
-        public static void LoadParam(string key, string val)
+        public static void LoadParam(string key)
+        {
+            LoadNull(key);
+        }
+
+        public static void LoadParam<T>(string key, T val)
+        {
+            dbCommand.Parameters.Add(new SqliteParameter($"@{key}", val));
+        }
+
+        /*public static void LoadParam(string key, string val)
         {
             dbCommand.Parameters.Add(new SqliteParameter($"@{key}", val));
         }
@@ -76,10 +90,10 @@ namespace bg3dialog2db
             dbCommand.Parameters.Add(new SqliteParameter($"@{key}", val));
         }
 
-        public static void LoadNull(string key)
+        public static void LoadParam(string key, bool val)
         {
-            dbCommand.Parameters.Add(new SqliteParameter($"@{key}", DBNull.Value));
-        }
+            dbCommand.Parameters.Add(new SqliteParameter($"@{key}", val));
+        }*/
 
         public static void ExecuteNonQuery()
         {
@@ -159,21 +173,44 @@ namespace bg3dialog2db
                 "Line TEXT)");
             ExecuteCommand("CREATE UNIQUE INDEX LocIDX ON Localization(UUID)");
 
+            ExecuteCommand("CREATE TABLE Quests (" +
+                "UUID TEXT, " +
+                "QuestID TEXT, " +
+                "QuestTitle TEXT, " +
+                "CategoryID TEXT, " +
+                "ParentQuestID TEXT, " +
+                "QuestVisiblity BOOL, " +
+                "QuestRewardTarget INT, " +
+                "SortingPriority INT, " +
+                "Source TEXT)");
+            ExecuteCommand("CREATE UNIQUE INDEX QuestIDX ON Quests(UUID)");
+
+            ExecuteCommand("CREATE TABLE QuestSteps (" +
+                "UUID TEXT, " +
+                "QuestUUID TEXT, " +
+                "Achievement TEXT, " +
+                "Description TEXT, " +
+                "DevComment TEXT, " +
+                "DialogFlagGUID TEXT, " +
+                "ExperienceReward TEXT, " +
+                "ID TEXT, " +
+                "LevelOverride INT, " +
+                "Objective TEXT, " +
+                "QuestRewardCount INT, " +
+                "QuestRewardLevel INT, " +
+                "QuestTitleOverride TEXT, " +
+                "ReputationGain INT, " +
+                "RewardAdditionalGold TEXT, " +
+                "RewardAdditionalOwnerGUID TEXT, " +
+                "RewardAdditionalOwnerLevelName TEXT, " +
+                "RewardAdditionalOwnerName TEXT, " +
+                "RewardAdditionalTreasureTable TEXT, " +
+                "StatTriggerGUID TEXT, " +
+                "UnlockDisable INT, " +
+                "Source TEXT)");
+            ExecuteCommand("CREATE UNIQUE INDEX QuestStepIDX ON QuestSteps(UUID)");
+
             dbInitialized = true;
         }
-
-        //Tags
-        //QuestFlags
-        //QuestGroupFlags?
-        //Reactions
-        //DC
-        //Names Merged
-        //Names Origin
-        //(combine to Names?)
-        //Speaker Groups
-        //Aud
-
-
-
     }
 }
